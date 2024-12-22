@@ -1,0 +1,10 @@
+let a = 5;
+let b = 10;
+let c = 2;
+
+sum = ?{a} + ?{b};
+product = ?{a} * ?{b};
+difference = ?{b} - ?{a};
+quotient = ?{b} / ?{c};
+
+nested = ?{a} * (?{b} + ?{c});

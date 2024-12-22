@@ -1,0 +1,5 @@
+let duration = 3600;  # in seconds
+let temperature = 25;  # in Celsius
+let pressure = 1.013;  # in atm
+
+consumption = ?{duration} * ?{temperature} * ?{pressure};
