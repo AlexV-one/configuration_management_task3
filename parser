@@ -1,0 +1,94 @@
+import re
+import sys
+import toml
+import ast
+
+def parse_multiline_comments(text):
+    pattern = r'\{#.*?#\}'
+    return re.sub(pattern, '', text, flags=re.DOTALL)
+
+def parse_let_statements(text):
+    pattern = r'let\s+([a-zA-Z]+)\s*=\s*(.*?);'
+    matches = re.findall(pattern, text)
+    constants = {name: value.strip() for name, value in matches}
+    return constants, re.sub(pattern, '', text)
+
+def replace_constants(text, constants):
+    pattern = r'\?\{([a-zA-Z]+)\}'
+    def replace(match):
+        name = match.group(1)
+        if name in constants:
+            return constants[name]
+        else:
+            raise ValueError(f"Undefined constant: {name}")
+    return re.sub(pattern, replace, text)
+
+def parse_arrays(text):
+    pattern = r'<<\s*(.*?)\s*>>'
+    def replace(match):
+        array_str = match.group(1)
+        values = [v.strip() for v in array_str.split(',')]
+        # Прямое создание списка вместо использования toml.dumps
+        return f"[{', '.join(repr(v) for v in values)}]"
+    return re.sub(pattern, replace, text)
+
+def evaluate_expression(expr, constants):
+    try:
+        # Удаляем точки с запятой из выражения
+        expr = expr.replace(';', '')
+        # Заменяем константы в выражении
+        for name, value in constants.items():
+            expr = expr.replace(f'?{{{name}}}', value)
+        # Используем eval для вычисления выражения в безопасном контексте
+        return eval(expr, {}, constants)
+    except Exception as e:
+        raise ValueError(f"Error evaluating expression: {expr} - {e}")
+
+def parse_values(text, constants):
+    pattern = r'([a-zA-Z]+)\s*=\s*(.*?)(?=\s*[a-zA-Z]+\s*=|\Z)'
+    values = re.findall(pattern, text)
+    parsed_values = {}
+    for key, value in values:
+        try:
+            # Удаляем пробелы вокруг значения
+            value = value.strip()
+            # Проверяем, является ли значение списком (уже преобразованном в TOML формат)
+            if re.match(r'^\[(.*?)\]$', value):
+                parsed_value = ast.literal_eval(value)
+                if not isinstance(parsed_value, list):
+                    raise ValueError(f"Value for '{key}' is not a valid list: {value}")
+            else:
+                # Если значение содержит выражение, вычисляем его
+                parsed_value = evaluate_expression(value, constants)
+            parsed_values[key] = parsed_value
+        except Exception as e:
+            raise ValueError(f"Error parsing value for '{key}': {e}")
+    return parsed_values
+
+def main():
+    input_file = 'test1.txt'
+    try:
+        with open(input_file, 'r') as file:
+            text = file.read()
+    except FileNotFoundError:
+        print(f"File not found: {input_file}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        sys.exit(1)
+
+    try:
+        text = parse_multiline_comments(text)
+        constants, text = parse_let_statements(text)
+        text = replace_constants(text, constants)
+        text = parse_arrays(text)
+        parsed_values = parse_values(text, constants)
+    except ValueError as e:
+        print(f"Syntax error: {e}")
+        sys.exit(1)
+
+    toml_output = toml.dumps(parsed_values)
+    print(toml_output)
+
+if __name__ == '__main__':
+    main()
