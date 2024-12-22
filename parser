@@ -1,5 +1,5 @@
-import re
 import sys
+import re
 import toml
 import ast
 
@@ -65,8 +65,57 @@ def parse_values(text, constants):
             raise ValueError(f"Error parsing value for '{key}': {e}")
     return parsed_values
 
+def run_test(input_file, expected_output):
+    try:
+        with open(input_file, 'r') as file:
+            text = file.read()
+    except FileNotFoundError:
+        print(f"File not found: {input_file}")
+        return False
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return False
+
+    try:
+        text = parse_multiline_comments(text)
+        constants, text = parse_let_statements(text)
+        text = replace_constants(text, constants)
+        text = parse_arrays(text)
+        parsed_values = parse_values(text, constants)
+    except ValueError as e:
+        print(f"Syntax error: {e}")
+        return False
+
+    toml_output = toml.dumps(parsed_values)
+    if toml_output == expected_output:
+        print(f"Test {input_file} passed.")
+        return True
+    else:
+        print(f"Test {input_file} failed.")
+        print(f"Expected: {expected_output}")
+        print(f"Got: {toml_output}")
+        return False
+
 def main():
-    input_file = 'test1.txt'
+    if len(sys.argv) < 2:
+        print("Usage: python script.py <input_file>")
+        sys.exit(1)
+
+    input_file = sys.argv[1]
+
+    # Проверка на наличие ключа для запуска тестов
+    if input_file == '--test':
+        tests = [
+            ('test1.txt', 'diameter = 20\ncircumference = 62.8\narea = 314.0\ncolors = ["red", "green", "blue"]\n'),
+            ('test2.txt', 'sum = 15\nproduct = 50\ndifference = 5\nquotient = 5.0\nnested = 60\n'),
+            ('test3.txt', 'fruits_count = 3\nnumbers_sum = 15\n'),
+            ('test4.txt', 'nested_array = [1, 2, 3]\nnested_array_sum = 6\n')
+        ]
+
+        for test_file, expected_output in tests:
+            run_test(test_file, expected_output)
+        sys.exit(0)
+
     try:
         with open(input_file, 'r') as file:
             text = file.read()
